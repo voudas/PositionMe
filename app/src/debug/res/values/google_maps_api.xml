@@ -1,0 +1,24 @@
+<resources>
+    <!--
+    TODO: Before you run your application, you need a Google Maps API key.
+
+    To get one, follow this link, follow the directions and press "Create" at the end:
+
+    https://console.developers.google.com/flows/enableapi?apiid=maps_android_backend&keyType=CLIENT_SIDE_ANDROID&r=FD:C2:71:70:EC:81:DB:98:ED:29:A2:DC:B7:23:3D:6F:66:71:61:D1%3Bcom.openpositioning.PositionMe
+
+    You can also add your credentials to an existing key, using these values:
+
+    Package name:
+    com.openpositioning.PositionMe
+
+    SHA-1 certificate fingerprint:
+    FD:C2:71:70:EC:81:DB:98:ED:29:A2:DC:B7:23:3D:6F:66:71:61:D1
+
+    Alternatively, follow the directions here:
+    https://developers.google.com/maps/documentation/android/start#get-key
+
+    Once you have your key (it starts with "AIza"), replace the "google_maps_key"
+    string in this file.
+    -->
+    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">YOUR_KEY_HERE</string>
+</resources>

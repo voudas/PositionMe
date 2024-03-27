@@ -47,4 +47,5 @@ public class Wifi {
     public String toString() {
         return  "bssid: " + bssid +", level: " + level;
     }
+
 }

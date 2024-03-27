@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
+import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -47,10 +48,14 @@ import com.openpositioning.PositionMe.MapUtils;
 import com.openpositioning.PositionMe.OverlayManager;
 import com.openpositioning.PositionMe.PdrProcessing;
 import com.openpositioning.PositionMe.R;
+import com.openpositioning.PositionMe.ServerCommunications;
+import com.openpositioning.PositionMe.sensors.LocationResponse;
 import com.openpositioning.PositionMe.sensors.SensorFusion;
 import com.openpositioning.PositionMe.sensors.SensorTypes;
+import com.openpositioning.PositionMe.sensors.WifiFPManager;
 
 import java.util.List;
+import java.util.concurrent.Executors;
 
 /**
  * A simple {@link Fragment} subclass. The recording fragment is displayed while the app is actively
@@ -78,6 +83,9 @@ public class RecordingFragment extends Fragment {
     private SensorFusion sensorFusion;
     private CountDownTimer autoStop;
 
+    private WifiFPManager wifiFPManager;
+    private ServerCommunications serverCommunications;
+
     private boolean isManualSelection = false;
 
     // Data for trajectory and location
@@ -91,6 +99,7 @@ public class RecordingFragment extends Fragment {
 
     private OverlayManager overlayManager;
     private PdrProcessing pdrProcessing;
+
 
     private int currentFloor;
     double proximityThreshold = 10;
@@ -127,6 +136,8 @@ public class RecordingFragment extends Fragment {
         // Retrieve the starting location from SensorFusion
         this.startingLocation = sensorFusion.getGNSSLatitude(true);
         userLocation = startingLocation;
+        this.wifiFPManager = WifiFPManager.getInstance();
+        serverCommunications = new ServerCommunications(context);
     }
 
     /**
@@ -555,6 +566,7 @@ public class RecordingFragment extends Fragment {
                     currentMarker.setRotation(adjustedAzimuth);
                     gnssMarker.setPosition(gnssLocationLatlng);
                     gnssMarker.setRotation(adjustedAzimuth);
+                    fetchLocationAndAddMarker();
                 }
             }
 
@@ -562,6 +574,34 @@ public class RecordingFragment extends Fragment {
             locationUpdateHandler.postDelayed(this, 1000); // Update interval in milliseconds
         }
     };
+
+    private void fetchLocationAndAddMarker() {
+        Executors.newSingleThreadExecutor().submit(() -> {
+            try {
+                String wifiFingerprintJson = wifiFPManager.createWifiFingerprintJson();
+                LocationResponse locationResponse = serverCommunications.sendWifiFingerprintToServer(wifiFingerprintJson);
+
+                getActivity().runOnUiThread(() -> {
+                    if (locationResponse != null && mMap != null && !Double.isNaN(locationResponse.getLatitude()) && !Double.isNaN(locationResponse.getLongitude())) {
+                        LatLng wifiLocation = new LatLng(locationResponse.getLatitude(), locationResponse.getLongitude());
+                        mMap.addMarker(new MarkerOptions()
+                                .position(wifiLocation)
+                                .title("Wi-Fi Location") // You can also include the floor information if needed
+                                .snippet("Floor: " + locationResponse.getFloor()) // Assuming floor is a string. If it's null, this will show "Floor: null"
+                        );
+                        // Optionally, move the camera
+                        mMap.animateCamera(CameraUpdateFactory.newLatLng(wifiLocation));
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                // Consider providing feedback to the user that an error occurred
+                getActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Error fetching location", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
 
     private LatLng convertDisplacementToLatLng(float[] location, float[] displacement) {
         // Calculate adjustment for longitude based on latitude

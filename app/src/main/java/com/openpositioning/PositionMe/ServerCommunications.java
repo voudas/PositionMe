@@ -4,14 +4,20 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.util.Log;
+import android.util.Pair;
 
 import androidx.preference.PreferenceManager;
 
 import com.google.gson.Gson;
 import com.openpositioning.PositionMe.fragments.FilesFragment;
+import com.openpositioning.PositionMe.sensors.LocationResponse;
 import com.openpositioning.PositionMe.sensors.Observable;
 import com.openpositioning.PositionMe.sensors.Observer;
 import com.google.protobuf.util.JsonFormat;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -440,8 +446,8 @@ public class ServerCommunications implements Observable {
             }
         }
     }
-
-    public void sendWifiFingerprintToServer(String jsonWifiFingerprint) {
+    public LocationResponse sendWifiFingerprintToServer(String jsonWifiFingerprint) throws IOException {
+        Log.d("ServerCommunications", "JSON being sent: " + jsonWifiFingerprint);
         OkHttpClient client = new OkHttpClient();
         // Define the URL of the API
         String apiUrl = "https://openpositioning.org/api/position/fine";
@@ -460,27 +466,39 @@ public class ServerCommunications implements Observable {
                 .addHeader("Content-Type", "application/json")
                 .build();
 
-        // Send the HTTP request
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                // Handle the error
-                e.printStackTrace();
-            }
+        // Execute the request synchronously
+        try (Response response = client.newCall(request).execute()) {
+            // Parse the response based on the status code
+            if (response.isSuccessful()) {
+                // Parse the successful response to extract latitude and longitude
+                String responseData = response.body().string();
+                // Log the response data
+                Log.d("ServerCommunications", "Response received: " + responseData);
 
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful()) {
-                    String responseBody = response.body().string();
-                    // Handle the successful response here
-                    System.out.println("Success: " + responseBody);
-                    // Update the UI or notify observers with the new location data
-                    // This is where you would parse the location data from the response
-                } else {
-                    // Handle unsuccessful responses here, such as validation errors
-                    System.out.println("Response Code: " + response.code() + " - " + response.message());
-                }
+                JSONObject jsonObj = new JSONObject(responseData);
+                double latitude = jsonObj.optDouble("latitude", Double.NaN); // Default to NaN if not present
+                double longitude = jsonObj.optDouble("longitude", Double.NaN);
+                String floor = jsonObj.optString("floor", null); // Default to null if not present
+                return new LocationResponse(latitude, longitude, floor);
+            } else if (response.code() == 422) {
+                // Handle the validation error
+                String responseBody = response.body().string();
+                Log.e("Validation Error", responseBody);
+                // Additional error handling goes here
+                throw new IOException("Validation error with body: " + responseBody);
+            } else {
+                // Handle other types of errors
+                Log.e("Response Code", response.code() + " " + response.body().string());
+                throw new IOException("Unexpected response code: " + response.code());
             }
-        });
-    }
+        } catch (JSONException e) {
+            // Log JSON parsing error or handle itappropriately
+            Log.e("ServerCommunications", "JSON parsing error", e);
+            throw new IOException("JSON parsing error", e);
+            } catch (IOException e) {
+            // Log network or other IO errors and rethrow them
+            Log.e("ServerCommunications", "Network or IO error", e);
+            throw e;
+            }
+        }
 }

@@ -7,6 +7,7 @@ import android.net.NetworkInfo;
 
 import androidx.preference.PreferenceManager;
 
+import com.google.gson.Gson;
 import com.openpositioning.PositionMe.fragments.FilesFragment;
 import com.openpositioning.PositionMe.sensors.Observable;
 import com.openpositioning.PositionMe.sensors.Observer;
@@ -25,10 +26,12 @@ import java.util.List;
 import java.util.zip.ZipInputStream;
 
 import okhttp3.Call;
+import okhttp3.Callback;
 import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
@@ -93,6 +96,7 @@ public class ServerCommunications implements Observable {
         this.observers = new ArrayList<>();
     }
 
+
     /**
      * Outgoing communication request with a {@link Traj trajectory} object. The recorded
      * trajectory is passed to the method. It is processed into the right format for sending
@@ -135,7 +139,7 @@ public class ServerCommunications implements Observable {
             // Instantiate client for HTTP requests
             OkHttpClient client = new OkHttpClient();
 
-            // Creaet a equest body with a file to upload in multipart/form-data format
+            // Create a request body with a file to upload in multipart/form-data format
             RequestBody requestBody = new MultipartBody.Builder().setType(MultipartBody.FORM)
                     .addFormDataPart("file", file.getName(),
                             RequestBody.create(MediaType.parse("text/plain"), file))
@@ -435,5 +439,48 @@ public class ServerCommunications implements Observable {
                 o.update(new Boolean[] {success});
             }
         }
+    }
+
+    public void sendWifiFingerprintToServer(String jsonWifiFingerprint) {
+        OkHttpClient client = new OkHttpClient();
+        // Define the URL of the API
+        String apiUrl = "https://openpositioning.org/api/position/fine";
+
+        // Create a MediaType to specify the type of the request body
+        MediaType JSON = MediaType.get("application/json; charset=utf-8");
+
+        // Create the request body with the JSON string
+        RequestBody body = RequestBody.create(jsonWifiFingerprint, JSON);
+
+        // Build the HTTP request
+        Request request = new Request.Builder()
+                .url(apiUrl)
+                .post(body)
+                .addHeader("Accept", "application/json")
+                .addHeader("Content-Type", "application/json")
+                .build();
+
+        // Send the HTTP request
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                // Handle the error
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    // Handle the successful response here
+                    System.out.println("Success: " + responseBody);
+                    // Update the UI or notify observers with the new location data
+                    // This is where you would parse the location data from the response
+                } else {
+                    // Handle unsuccessful responses here, such as validation errors
+                    System.out.println("Response Code: " + response.code() + " - " + response.message());
+                }
+            }
+        });
     }
 }
